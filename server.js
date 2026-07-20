@@ -240,6 +240,52 @@ app.get('/api/debug-balance', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+const PDFDocument = require('pdfkit');
+
+app.post('/api/cards/pdf', requireAdmin, (req, res) => {
+  const { cards } = req.body;
+  if (!Array.isArray(cards) || cards.length === 0) {
+    return res.status(400).json({ error: 'No cards provided' });
+  }
+
+  const doc = new PDFDocument({ size: 'A4', margin: 20 });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename="e24data-cards.pdf"');
+  doc.pipe(res);
+
+  const cols = 5;
+  const rows = 10;
+  const perPage = cols * rows;
+  const margin = 20;
+  const cardW = (doc.page.width - margin * 2) / cols;
+  const cardH = (doc.page.height - margin * 2) / rows;
+
+  cards.forEach((card, i) => {
+    const posInPage = i % perPage;
+    if (i > 0 && posInPage === 0) doc.addPage();
+
+    const col = posInPage % cols;
+    const row = Math.floor(posInPage / cols);
+    const x = margin + col * cardW;
+    const y = margin + row * cardH;
+
+    doc.rect(x, y, cardW, cardH).stroke();
+
+    doc.fontSize(7).font('Helvetica-Bold')
+      .text('E24Data Card', x, y + 4, { width: cardW, align: 'center' });
+
+    doc.fontSize(5).font('Helvetica')
+      .text(`S/N: ${String(i + 1).padStart(5, '0')}`, x, y + cardH / 2 - 12, { width: cardW, align: 'center' });
+
+    doc.fontSize(9).font('Helvetica-Bold')
+      .text(card.pin, x, y + cardH / 2 - 2, { width: cardW, align: 'center' });
+
+    doc.fontSize(5).font('Helvetica')
+      .text('Dial *XXX# to redeem', x, y + cardH - 14, { width: cardW, align: 'center' });
+  });
+
+  doc.end();
+});
 app.listen(PORT, () => {
   console.log(`E24 Data backend running on port ${PORT}`);
 });
