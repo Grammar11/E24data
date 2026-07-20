@@ -138,7 +138,7 @@ app.get('/api/cards', requireAdmin, (req, res) => {
 // ---------------------------------------------------------------------------
 app.post('/api/cards/generate', requireAdmin, (req, res) => {
   const { network, size, price, qty } = req.body;
-  const q = Math.min(Math.max(parseInt(qty, 10) || 1, 1), 50);
+  const q = Math.min(Math.max(parseInt(qty, 10) || 1, 1), 5000);
   const p = parseInt(price, 10) || 0;
   const totalCost = p * q;
 
