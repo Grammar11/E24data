@@ -1,17 +1,15 @@
 // E24 Data — Backend Server
-// This is the "Server" step in: Customer → Server → API → MTN/Airtel/Glo/9mobile → Data lands
+// Customer → Server → API → MTN/Airtel/Glo/9mobile → Data lands
 //
-// WHY THIS FILE EXISTS:
-// Your Clubkonnect UserID and APIKey must NEVER live in the website's HTML/JS,
-// because anyone can view page source and steal them. This server keeps those
-// secrets safe (as environment variables) and is the ONLY thing that talks to
-// Clubkonnect. The website talks to THIS server instead.
+// Clubkonnect UserID/APIKey live only as environment variables here.
+// Wallet + cards now live in MongoDB Atlas instead of a local db.json file,
+// because Render's free tier wipes local files on every restart.
 
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
+const { MongoClient } = require('mongodb');
+const PDFDocument = require('pdfkit');
 
 const app = express();
 app.use(cors());
@@ -21,20 +19,15 @@ const PORT = process.env.PORT || 3000;
 const CK_USERID = process.env.CLUBKONNECT_USERID;
 const CK_APIKEY = process.env.CLUBKONNECT_APIKEY;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '@Nura2652';
+const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!CK_USERID || !CK_APIKEY) {
-  console.warn('⚠️  CLUBKONNECT_USERID / CLUBKONNECT_APIKEY not set. Copy .env.example to .env and fill them in.');
+  console.warn('⚠️  CLUBKONNECT_USERID / CLUBKONNECT_APIKEY not set.');
+}
+if (!MONGODB_URI) {
+  console.warn('⚠️  MONGODB_URI not set. Database calls will fail.');
 }
 
-// ---------------------------------------------------------------------------
-// Clubkonnect network + data plan codes.
-//
-// IMPORTANT: These MobileNetwork numbers and DataPlan codes are specific to
-// YOUR Clubkonnect account and can change. Log in to clubkonnect.com, open
-// "API Documentation" and the "Data Bundle Prices" page, and replace the
-// values below with the exact codes shown there. Do not guess — using the
-// wrong DataPlan code will sell the wrong bundle or fail the order.
-// ---------------------------------------------------------------------------
 const NETWORK_CODES = {
   MTN: '01',
   Glo: '02',
@@ -42,52 +35,33 @@ const NETWORK_CODES = {
   Airtel: '04',
 };
 
-// Map "<Network>_<Size>" -> Clubkonnect DataPlan code (PRODUCT_CODE from
-// their API docs, fetched from https://www.nellobytesystems.com/APIDatabundlePlansV3.asp)
-// Confirmed against account CK101284802 on 2026-07-19.
 const DATA_PLAN_CODES = {
-  // MTN — Monthly SME plans
-  'MTN_500MB': '9',   // 500 MB - Monthly (SME), ₦307
-  'MTN_1GB': '10',    // 1 GB - Monthly (SME), ₦563
-  'MTN_2GB': '11',    // 2 GB - Monthly (SME), ₦1117
-  'MTN_5GB': '13',    // 5 GB - Monthly (SME), ₦2511
-
-  // Glo
-  'Glo_500MB': '2',   // 500 MB - 7 days (SME), ₦230
-  'Glo_1GB': '3',     // 1 GB - 30 days (SME), ₦461
-  'Glo_2GB': '4',     // 2 GB - 30 days (SME), ₦922
-  'Glo_5GB': '6',     // 5 GB - 30 days (SME), ₦2306
-
-  // 9mobile (Clubkonnect calls this "t2mobile" / "m_9mobile")
-  '9mobile_500MB': '4',  // 500 MB - 30 days (SME), ₦246
-  '9mobile_1GB': '5',    // 1 GB - 30 days (SME), ₦492
-  '9mobile_2GB': '6',    // 2 GB - 30 days (SME), ₦984
-  '9mobile_5GB': '9',    // 5 GB - 30 days (SME), ₦2460
-
-  // Airtel — no exact 5GB plan exists; using 8GB so customers never get
-  // less than advertised. Update the "5GB" label in the frontend dropdown
-  // to "8GB" for Airtel if you want this to be fully accurate.
-  'Airtel_500MB': '19',  // 500MB - 7 days (Direct Data), ₦484.92
-  'Airtel_1GB': '20',    // 1GB - 7 days (Direct Data), ₦775.91
-  'Airtel_2GB': '26',    // 2GB - 30 days (Direct Data), ₦1454.93
-  'Airtel_5GB': '29',    // 8GB - 30 days (Direct Data), ₦2909.92 — closest to 5GB
+  'MTN_500MB': '9', 'MTN_1GB': '10', 'MTN_2GB': '11', 'MTN_5GB': '13',
+  'Glo_500MB': '2', 'Glo_1GB': '3', 'Glo_2GB': '4', 'Glo_5GB': '6',
+  '9mobile_500MB': '4', '9mobile_1GB': '5', '9mobile_2GB': '6', '9mobile_5GB': '9',
+  'Airtel_500MB': '19', 'Airtel_1GB': '20', 'Airtel_2GB': '26', 'Airtel_5GB': '29',
 };
 
-// ---------------------------------------------------------------------------
-// Tiny file-based "database". Fine for testing — for real launch, replace
-// this with a proper database (PostgreSQL, MySQL, MongoDB) so multiple
-// requests can't corrupt the file and data survives server restarts cleanly.
-// ---------------------------------------------------------------------------
-const DB_PATH = path.join(__dirname, 'db.json');
+const client = new MongoClient(MONGODB_URI);
+let stateCollection;
 
-function loadDB() {
-  if (!fs.existsSync(DB_PATH)) {
-    return { wallet: 0, cards: [] };
+async function connectDB() {
+  await client.connect();
+  const database = client.db('e24data');
+  stateCollection = database.collection('state');
+  const existing = await stateCollection.findOne({ _id: 'main' });
+  if (!existing) {
+    await stateCollection.insertOne({ _id: 'main', wallet: 0, cards: [] });
+    console.log('Created initial database document.');
   }
-  return JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+  console.log('✅ Connected to MongoDB Atlas.');
 }
-function saveDB(db) {
-  fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+
+async function loadDB() {
+  return stateCollection.findOne({ _id: 'main' });
+}
+async function saveDB(db) {
+  await stateCollection.replaceOne({ _id: 'main' }, db);
 }
 
 function genPin() {
@@ -102,47 +76,32 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// ---------------------------------------------------------------------------
-// GET /api/wallet
-// ---------------------------------------------------------------------------
-app.get('/api/wallet', requireAdmin, (req, res) => {
-  const db = loadDB();
+app.get('/api/wallet', requireAdmin, async (req, res) => {
+  const db = await loadDB();
   res.json({ wallet: db.wallet });
 });
 
-// ---------------------------------------------------------------------------
-// POST /api/wallet/topup   { amount }
-// Demo only — in production this should be replaced by a real payment
-// gateway (Paystack/Flutterwave) webhook that credits the wallet after a
-// confirmed payment, never a client-supplied amount.
-// ---------------------------------------------------------------------------
-app.post('/api/wallet/topup', requireAdmin, (req, res) => {
+app.post('/api/wallet/topup', requireAdmin, async (req, res) => {
   const amount = parseInt(req.body.amount, 10);
   if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
-  const db = loadDB();
+  const db = await loadDB();
   db.wallet += amount;
-  saveDB(db);
+  await saveDB(db);
   res.json({ wallet: db.wallet });
 });
 
-// ---------------------------------------------------------------------------
-// GET /api/cards
-// ---------------------------------------------------------------------------
-app.get('/api/cards', requireAdmin, (req, res) => {
-  const db = loadDB();
+app.get('/api/cards', requireAdmin, async (req, res) => {
+  const db = await loadDB();
   res.json({ cards: db.cards });
 });
 
-// ---------------------------------------------------------------------------
-// POST /api/cards/generate   { network, size, price, qty }
-// ---------------------------------------------------------------------------
-app.post('/api/cards/generate', requireAdmin, (req, res) => {
+app.post('/api/cards/generate', requireAdmin, async (req, res) => {
   const { network, size, price, qty } = req.body;
   const q = Math.min(Math.max(parseInt(qty, 10) || 1, 1), 5000);
   const p = parseInt(price, 10) || 0;
   const totalCost = p * q;
 
-  const db = loadDB();
+  const db = await loadDB();
   if (totalCost > db.wallet) {
     return res.status(400).json({ error: 'Insufficient wallet balance' });
   }
@@ -153,16 +112,11 @@ app.post('/api/cards/generate', requireAdmin, (req, res) => {
   }
   db.cards.push(...newCards);
   db.wallet -= totalCost;
-  saveDB(db);
+  await saveDB(db);
 
   res.json({ cards: newCards, wallet: db.wallet });
 });
 
-// ---------------------------------------------------------------------------
-// POST /api/redeem   { pin, phone }
-// This is the real integration: Customer's PIN → this server → Clubkonnect
-// API → network → data lands on `phone`.
-// ---------------------------------------------------------------------------
 app.post('/api/redeem', async (req, res) => {
   const { pin, phone } = req.body;
 
@@ -170,7 +124,7 @@ app.post('/api/redeem', async (req, res) => {
     return res.status(400).json({ error: 'PIN and phone number are required' });
   }
 
-  const db = loadDB();
+  const db = await loadDB();
   const card = db.cards.find((c) => c.pin === pin);
 
   if (!card) {
@@ -185,7 +139,7 @@ app.post('/api/redeem', async (req, res) => {
 
   if (!networkCode || !planCode || planCode === 'REPLACE_ME') {
     return res.status(500).json({
-      error: 'This network/data size is not configured yet. Update DATA_PLAN_CODES in server.js with the real codes from your Clubkonnect dashboard.',
+      error: 'This network/data size is not configured yet. Update DATA_PLAN_CODES in server.js.',
     });
   }
 
@@ -206,18 +160,15 @@ app.post('/api/redeem', async (req, res) => {
 
     const result = response.data;
 
-    // Clubkonnect returns a JSON string like {"status":"ORDER_COMPLETED", ...}
-    // See: https://www.clubkonnect.com/APIDocs.asp (log in to view full status codes)
     if (result && (result.status === 'ORDER_COMPLETED' || result.status === 'ORDER_RECEIVED')) {
       card.status = 'used';
       card.redeemedTo = phone;
       card.redeemedAt = new Date().toISOString();
       card.orderId = result.orderid || null;
-      saveDB(db);
+      await saveDB(db);
       return res.json({ success: true, message: `${card.size} sent to ${phone}`, raw: result });
     }
 
-    // Card stays unused so the customer/agent can retry.
     console.log('Clubkonnect rejected order. Raw response:', JSON.stringify(result));
     return res.status(502).json({
       success: false,
@@ -229,6 +180,7 @@ app.post('/api/redeem', async (req, res) => {
     return res.status(502).json({ success: false, error: 'Could not reach Clubkonnect. Try again shortly.' });
   }
 });
+
 app.get('/api/debug-balance', async (req, res) => {
   try {
     const response = await axios.get('https://www.nellobytesystems.com/APIWalletBalanceV1.asp', {
@@ -237,55 +189,4 @@ app.get('/api/debug-balance', async (req, res) => {
     });
     res.json(response.data);
   } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-const PDFDocument = require('pdfkit');
-
-app.post('/api/cards/pdf', requireAdmin, (req, res) => {
-  const { cards } = req.body;
-  if (!Array.isArray(cards) || cards.length === 0) {
-    return res.status(400).json({ error: 'No cards provided' });
-  }
-
-  const doc = new PDFDocument({ size: 'A4', margin: 20 });
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', 'attachment; filename="e24data-cards.pdf"');
-  doc.pipe(res);
-
-  const cols = 5;
-  const rows = 10;
-  const perPage = cols * rows;
-  const margin = 20;
-  const cardW = (doc.page.width - margin * 2) / cols;
-  const cardH = (doc.page.height - margin * 2) / rows;
-
-  cards.forEach((card, i) => {
-    const posInPage = i % perPage;
-    if (i > 0 && posInPage === 0) doc.addPage();
-
-    const col = posInPage % cols;
-    const row = Math.floor(posInPage / cols);
-    const x = margin + col * cardW;
-    const y = margin + row * cardH;
-
-    doc.rect(x, y, cardW, cardH).stroke();
-
-    doc.fontSize(7).font('Helvetica-Bold')
-      .text('E24Data Card', x, y + 4, { width: cardW, align: 'center' });
-
-    doc.fontSize(5).font('Helvetica')
-      .text(`S/N: ${String(i + 1).padStart(5, '0')}`, x, y + cardH / 2 - 12, { width: cardW, align: 'center' });
-
-    doc.fontSize(9).font('Helvetica-Bold')
-      .text(card.pin, x, y + cardH / 2 - 2, { width: cardW, align: 'center' });
-
-    doc.fontSize(5).font('Helvetica')
-      .text('Dial *XXX# to redeem', x, y + cardH - 14, { width: cardW, align: 'center' });
-  });
-
-  doc.end();
-});
-app.listen(PORT, () => {
-  console.log(`E24 Data backend running on port ${PORT}`);
-});
+    res.status(500).json({
