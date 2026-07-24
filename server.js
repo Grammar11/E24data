@@ -239,7 +239,51 @@ app.post('/api/cards/pdf', requireAdmin, (req, res) => {
 
   doc.end();
 });
+const NETWORK_IDS = {
+  MTN: 1,
+  AIRTEL: 2,
+  GLO: 3,
+  '9MOBILE': 4
+};
 
+app.post('/api/redeem', async (req, res) => {
+  try {
+    const { network, planId, phone } = req.body;
+
+    const networkId = NETWORK_IDS[network.toUpperCase()];
+    if (!networkId) {
+      return res.status(400).json({ success: false, message: 'Invalid network' });
+    }
+
+    const ref = `E24-${Date.now()}`;
+
+    const response = await axios.post(
+      'https://smeapi.com.ng/api/data/',
+      {
+        network: networkId,
+        data_plan: planId,
+        phone: phone,
+        ported_number: false,
+        ref: ref
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.SMEAPI_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    res.json({ success: true, data: response.data });
+
+  } catch (error) {
+    console.error('SME API Error:', error.response?.data || error.message);
+    res.status(500).json({
+      success: false,
+      message: error.response?.data?.message || 'Data purchase failed'
+    });
+  }
+});
 connectDB()
   .then(() => {
     app.listen(PORT, () => {
