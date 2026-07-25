@@ -16,14 +16,11 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
-const CK_USERID = process.env.CLUBKONNECT_USERID;
-const CK_APIKEY = process.env.CLUBKONNECT_APIKEY;
+
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '@Nura2652';
 const MONGODB_URI = process.env.MONGODB_URI;
 
-if (!CK_USERID || !CK_APIKEY) {
-  console.warn('⚠️  CLUBKONNECT_USERID / CLUBKONNECT_APIKEY not set.');
-}
+
 if (!MONGODB_URI) {
   console.warn('⚠️  MONGODB_URI not set. Database calls will fail.');
 }
