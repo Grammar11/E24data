@@ -186,19 +186,6 @@ app.post('/api/redeem', async (req, res) => {
     return res.status(502).json({ success: false, error: 'Could not reach SME API' });
   }
 });
-app.get('/api/debug-balance', async (req, res) => {
-  try {
-    const response = await axios.get('https://www.nellobytesystems.com/APIWalletBalanceV1.asp', {
-      params: { UserID: CK_USERID, APIKey: CK_APIKEY },
-      timeout: 20000,
-    });
-    res.json(response.data);
-  } catch (err) {
-    res.status(500).json({
-error: err.message,
-    });
-  }
-});
 
 app.post('/api/cards/pdf', requireAdmin, (req, res) => {
   const { cards } = req.body;
