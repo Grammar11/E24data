@@ -157,8 +157,9 @@ app.post('/api/redeem', async (req, res) => {
       },
       {
         headers: {
-          'Authorization': `Bearer ${process.env.SMEAPI_KEY?.trim()}`,
-          'Content-Type': 'application/json'
+  'X-API-KEY': process.env.SMEAPI_KEY?.trim(),
+  'Content-Type': 'application/json'
+        }
         }
       }
     );
