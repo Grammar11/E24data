@@ -181,8 +181,13 @@ app.post('/api/redeem', async (req, res) => {
       raw: result
     });
 
-  } catch (err) {
-    console.error('SME API error:', err.response?.data || err.message);
+} catch (err) {
+    console.error('SME API error - Full details:');
+    console.error('Status code:', err.response?.status);
+    console.error('Response headers:', JSON.stringify(err.response?.headers));
+    console.error('Response body:', JSON.stringify(err.response?.data));
+    console.error('Request headers sent:', JSON.stringify(err.config?.headers));
+    console.error('Error message:', err.message);
     return res.status(502).json({ success: false, error: 'Could not reach SME API' });
   }
 });
