@@ -27,19 +27,23 @@ if (!CK_USERID || !CK_APIKEY) {
 if (!MONGODB_URI) {
   console.warn('⚠️  MONGODB_URI not set. Database calls will fail.');
 }
-
-const NETWORK_CODES = {
-  MTN: '01',
-  Glo: '02',
-  '9mobile': '03',
-  Airtel: '04',
+const NETWORK_IDS = {
+  MTN: 1,
+  Airtel: 2,
+  Glo: 3,
+  '9mobile': 4
 };
 
-const DATA_PLAN_CODES = {
-  'MTN_500MB': '9', 'MTN_1GB': '10', 'MTN_2GB': '11', 'MTN_5GB': '13',
-  'Glo_500MB': '2', 'Glo_1GB': '3', 'Glo_2GB': '4', 'Glo_5GB': '6',
-  '9mobile_500MB': '4', '9mobile_1GB': '5', '9mobile_2GB': '6', '9mobile_5GB': '9',
-  'Airtel_500MB': '19', 'Airtel_1GB': '20', 'Airtel_2GB': '26', 'Airtel_5GB': '29',
+const SMEAPI_PLAN_IDS = {
+  MTN_500MB: 1,
+  MTN_1GB: 2,
+  MTN_2GB: 3,
+  MTN_3GB: 4,
+  Airtel_1GB: 71,
+  Airtel_2GB: 79,
+  Glo_1GB: 114,
+  'Glo_2.5GB': 121,
+  Glo_3GB: 123
 };
 
 const client = new MongoClient(MONGODB_URI);
@@ -116,7 +120,6 @@ app.post('/api/cards/generate', requireAdmin, async (req, res) => {
 
   res.json({ cards: newCards, wallet: db.wallet });
 });
-
 app.post('/api/redeem', async (req, res) => {
   const { pin, phone } = req.body;
 
@@ -134,53 +137,58 @@ app.post('/api/redeem', async (req, res) => {
     return res.status(409).json({ error: 'This PIN has already been used' });
   }
 
-  const networkCode = NETWORK_CODES[card.network];
-  const planCode = DATA_PLAN_CODES[`${card.network}_${card.size}`];
+  const networkId = NETWORK_IDS[card.network];
+  const planId = SMEAPI_PLAN_IDS[`${card.network}_${card.size}`];
 
-  if (!networkCode || !planCode || planCode === 'REPLACE_ME') {
+  if (!networkId || !planId) {
     return res.status(500).json({
-      error: 'This network/data size is not configured yet. Update DATA_PLAN_CODES in server.js.',
+      error: 'This network/data size is not configured yet. Update SMEAPI_PLAN_IDS.'
     });
   }
 
-  const requestID = `E24-${Date.now()}`;
+  const ref = `E24-${Date.now()}`;
 
   try {
-    const response = await axios.get('https://www.nellobytesystems.com/APIDatabundleV1.asp', {
-      params: {
-        UserID: CK_USERID,
-        APIKey: CK_APIKEY,
-        MobileNetwork: networkCode,
-        DataPlan: planCode,
-        MobileNumber: phone,
-        RequestID: requestID,
+    const response = await axios.post(
+      'https://smeapi.com.ng/api/data/',
+      {
+        network: networkId,
+        data_plan: planId,
+        phone: phone,
+        ported_number: false,
+        ref: ref
       },
-      timeout: 20000,
-    });
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.SMEAPI_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
 
     const result = response.data;
 
-    if (result && (result.status === 'ORDER_COMPLETED' || result.status === 'ORDER_RECEIVED')) {
+    if (result && result.status === 'success') {
       card.status = 'used';
       card.redeemedTo = phone;
       card.redeemedAt = new Date().toISOString();
-      card.orderId = result.orderid || null;
+      card.orderRef = ref;
       await saveDB(db);
-      return res.json({ success: true, message: `${card.size} sent to ${phone}`, raw: result });
+      return res.json({ success: true, message: `${card.size} sent to ${phone}` });
     }
 
-    console.log('Clubkonnect rejected order. Raw response:', JSON.stringify(result));
+    console.log('SME API rejected order. Raw response:', JSON.stringify(result));
     return res.status(502).json({
       success: false,
-      error: 'Clubkonnect could not complete the order',
-      raw: result,
+      error: 'SME API could not complete the order',
+      raw: result
     });
+
   } catch (err) {
-    console.error('Clubkonnect API error:', err.message);
-    return res.status(502).json({ success: false, error: 'Could not reach Clubkonnect. Try again shortly.' });
+    console.error('SME API error:', err.response?.data || err.message);
+    return res.status(502).json({ success: false, error: 'Could not reach SME API' });
   }
 });
-
 app.get('/api/debug-balance', async (req, res) => {
   try {
     const response = await axios.get('https://www.nellobytesystems.com/APIWalletBalanceV1.asp', {
@@ -238,51 +246,6 @@ app.post('/api/cards/pdf', requireAdmin, (req, res) => {
   });
 
   doc.end();
-});
-const NETWORK_IDS = {
-  MTN: 1,
-  AIRTEL: 2,
-  GLO: 3,
-  '9MOBILE': 4
-};
-
-app.post('/api/redeem', async (req, res) => {
-  try {
-    const { network, planId, phone } = req.body;
-
-    const networkId = NETWORK_IDS[network.toUpperCase()];
-    if (!networkId) {
-      return res.status(400).json({ success: false, message: 'Invalid network' });
-    }
-
-    const ref = `E24-${Date.now()}`;
-
-    const response = await axios.post(
-      'https://smeapi.com.ng/api/data/',
-      {
-        network: networkId,
-        data_plan: planId,
-        phone: phone,
-        ported_number: false,
-        ref: ref
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.SMEAPI_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    res.json({ success: true, data: response.data });
-
-  } catch (error) {
-    console.error('SME API Error:', error.response?.data || error.message);
-    res.status(500).json({
-      success: false,
-      message: error.response?.data?.message || 'Data purchase failed'
-    });
-  }
 });
 connectDB()
   .then(() => {
