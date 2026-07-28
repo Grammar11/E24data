@@ -26,9 +26,9 @@ if (!MONGODB_URI) {
 }
 const NETWORK_IDS = {
   MTN: 1,
-  Airtel: 2,
-  Glo: 3,
-  '9mobile': 4
+  Glo: 2,
+  '9mobile': 3,
+  Airtel: 4,
 };
 
 const SMEAPI_PLAN_IDS = {
