@@ -262,8 +262,10 @@ app.post('/api/ussd', async (req, res) => {
     return res.send('END Sorry, the network could not complete this order. Please try again later.');
 
   } catch (err) {
-    console.error('USSD redeem error:', err.message);
-    return res.send('END Sorry, something went wrong. Please try again later.');
+     console.error('USSD redeem error - Status:', err.response?.status);
+     console.error('USSD redeem error - Body:', JSON.stringify(err.response?.data));
+     console.error('USSD redeem error - Message:', err.message);
+     return res.send('END Sorry, something went wrong. Please try again later.');
   }
 });
 app.post('/api/cards/pdf', requireAdmin, (req, res) => {
