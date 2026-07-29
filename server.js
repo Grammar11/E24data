@@ -14,7 +14,8 @@ const PDFDocument = require('pdfkit');
 const app = express();
 app.use(cors());
 app.use(express.json());
-
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 const PORT = process.env.PORT || 3000;
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '@Nura2652';
@@ -193,6 +194,79 @@ app.post('/api/redeem', async (req, res) => {
   }
 });
 
+app.post('/api/ussd', async (req, res) => {
+  const { phoneNumber, text } = req.body;
+  res.set('Content-Type', 'text/plain');
+
+  const parts = (text || '').split('*').filter(Boolean);
+
+  try {
+    if (parts.length === 0) {
+      return res.send('CON Welcome to E24Data\nEnter your PIN to redeem data:');
+    }
+
+    if (parts.length === 1) {
+      return res.send('CON Enter phone number to receive data:');
+    }
+
+    const pin = parts[0];
+    const phone = parts[1];
+
+    const db = await loadDB();
+    const card = db.cards.find(c => c.pin === pin);
+
+    if (!card) {
+      return res.send('END PIN not found. Please check and try again.');
+    }
+    if (card.status === 'used') {
+      return res.send('END This PIN has already been used.');
+    }
+
+    const networkId = NETWORK_IDS[card.network];
+    const planId = SMEAPI_PLAN_IDS[`${card.network}_${card.size}`];
+
+    if (!networkId || !planId) {
+      return res.send('END This network/data size is not available yet.');
+    }
+
+    const ref = `E24-${Date.now()}`;
+
+    const response = await axios.post(
+      'https://smeapi.com.ng/api/data/',
+      {
+        network: networkId,
+        data_plan: planId,
+        phone: phone,
+        ported_number: false,
+        ref: ref
+      },
+      {
+        headers: {
+          'Authorization': `Token ${process.env.SMEAPI_KEY?.trim()}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      }
+    );
+
+    const result = response.data;
+
+    if (result && result.status === 'success') {
+      card.status = 'used';
+      card.redeemedTo = phone;
+      card.redeemedAt = new Date().toISOString();
+      card.orderRef = ref;
+      await saveDB(db);
+      return res.send(`END Success! ${card.size} has been sent to ${phone}`);
+    }
+
+    return res.send('END Sorry, the network could not complete this order. Please try again later.');
+
+  } catch (err) {
+    console.error('USSD redeem error:', err.message);
+    return res.send('END Sorry, something went wrong. Please try again later.');
+  }
+});
 app.post('/api/cards/pdf', requireAdmin, (req, res) => {
   const { cards } = req.body;
   if (!Array.isArray(cards) || cards.length === 0) {
