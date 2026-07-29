@@ -204,15 +204,11 @@ app.post('/api/ussd', async (req, res) => {
       return res.send('CON Welcome to E24Data\nEnter your PIN to redeem data:');
     }
 
-    if (parts.length === 1) {
-      return res.send('CON Enter phone number to receive data:');
-    }
-
-    const pin = parts[0];
-    const phone = parts[1];
+ const pin = parts[0].replace(/-/g, '');
+      const phone = phoneNumber;
 
     const db = await loadDB();
-    const card = db.cards.find(c => c.pin === pin);
+    const card = db.cards.find(c => c.pin.replace(/-/g, '') === pin);
 
     if (!card) {
       return res.send('END PIN not found. Please check and try again.');
