@@ -326,10 +326,6 @@ app.get('/api/test-sms', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-} catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});   ← layi 328, ƙarshen /api/test-sms
 
 app.get('/api/check-env', (req, res) => {
   const key = process.env.AT_API_KEY || '';
@@ -342,9 +338,6 @@ app.get('/api/check-env', (req, res) => {
   });
 });
 
-connectDB()   ← layi 329, kada ka taɓa shi
-  .then(() => {
-  ...
 connectDB()
   .then(() => {
     app.listen(PORT, () => {
