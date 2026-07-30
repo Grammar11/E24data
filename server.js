@@ -308,6 +308,24 @@ app.post('/api/cards/pdf', requireAdmin, (req, res) => {
 
   doc.end();
 });
+app.get('/api/test-sms', async (req, res) => {
+  try {
+    const AfricasTalking = require('africastalking')({
+      apiKey: process.env.AT_API_KEY,
+      username: process.env.AT_USERNAME
+    });
+    const sms = AfricasTalking.SMS;
+
+    const result = await sms.send({
+      to: ['+2348147972378'],
+      message: 'Test SMS to activate E24Data Production account'
+    });
+
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 connectDB()
   .then(() => {
     app.listen(PORT, () => {
