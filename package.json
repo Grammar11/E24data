@@ -11,7 +11,7 @@
     "pdfkit": "^0.15.0",
     "cors": "^2.8.5",
     "express": "^4.19.2",
-    "mongodb": "^6.10.0"
+    "mongodb": "^6.10.0",
     "africastalking": "^0.7.0",
   }
 }
