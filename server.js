@@ -326,6 +326,25 @@ app.get('/api/test-sms', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+} catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});   ← layi 328, ƙarshen /api/test-sms
+
+app.get('/api/check-env', (req, res) => {
+  const key = process.env.AT_API_KEY || '';
+  const user = process.env.AT_USERNAME || '';
+  res.json({
+    apiKeyLength: key.length,
+    apiKeyStart: key.substring(0, 4),
+    apiKeyEnd: key.substring(key.length - 4),
+    username: user
+  });
+});
+
+connectDB()   ← layi 329, kada ka taɓa shi
+  .then(() => {
+  ...
 connectDB()
   .then(() => {
     app.listen(PORT, () => {
