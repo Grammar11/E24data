@@ -38,7 +38,7 @@ const SMEAPI_PLAN_IDS = {
   MTN_3GB: 4,
   Airtel_1GB: 71,
   Airtel_2GB: 79,
-  Glo_1GB: 114,
+  Glo_1GB: 113,
   'Glo_2.5GB': 121,
   Glo_3GB: 123
 };
