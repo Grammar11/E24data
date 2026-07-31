@@ -317,7 +317,7 @@ app.get('/api/test-sms', async (req, res) => {
     const sms = AfricasTalking.SMS;
 
     const result = await sms.send({
-      to: ['+2348147972378'],
+    to: ['+2349053398424'],
       message: 'Test SMS to activate E24Data Production account'
     });
 
