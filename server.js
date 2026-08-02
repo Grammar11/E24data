@@ -69,7 +69,6 @@ async function saveDB(db) {
 function genPin() {
     return String(Math.floor(10000000 + Math.random() * 90000000));
 }
-}
 
 function requireAdmin(req, res, next) {
   if (req.headers['x-admin-password'] !== ADMIN_PASSWORD) {
