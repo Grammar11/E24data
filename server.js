@@ -324,7 +324,7 @@ app.post('/api/cards/pdf', requireAdmin, (req, res) => {
     console.error(err.stack);
     if (!res.headersSent) res.status(500).json({ error: 'PDF generation failed: ' + err.message });
  }
-
+});
 connectDB()
   .then(() => {
     app.listen(PORT, () => {
