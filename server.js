@@ -265,16 +265,14 @@ app.post('/api/ussd', async (req, res) => {
   }
 });
 app.post('/api/cards/pdf', requireAdmin, (req, res) => {
+ try {
   const { cards } = req.body;
   if (!Array.isArray(cards) || cards.length === 0) {
     return res.status(400).json({ error: 'No cards provided' });
   }
+  console.log(`📄 PDF request: ${cards.length} cards`);
 
   const doc = new PDFDocument({ size: 'A4', margin: 20 });
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', 'attachment; filename="e24data-cards.pdf"');
-  doc.pipe(res);
-
   const gap = 6;
     const cols = 5;
     const rows = 10;
@@ -319,8 +317,13 @@ app.post('/api/cards/pdf', requireAdmin, (req, res) => {
     
   });
 
-  doc.end();
-});
+    doc.end();
+    console.log('✅ PDF generation complete');
+ } catch (err) {
+    console.error('❌ PDF generation error:', err.message);
+    console.error(err.stack);
+    if (!res.headersSent) res.status(500).json({ error: 'PDF generation failed: ' + err.message });
+ }
 
 connectDB()
   .then(() => {
