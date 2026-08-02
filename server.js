@@ -67,7 +67,6 @@ async function saveDB(db) {
 }
 
 function genPin() {
-  function genPin() {
     return String(Math.floor(10000000 + Math.random() * 90000000));
   }
 
@@ -84,9 +83,6 @@ function genPin() {
     db.serialCounter = (db.serialCounter || 0) + 1;
     return String(db.serialCounter).padStart(8, '0');
   }
-    return String(Math.floor(10000000 + Math.random() * 90000000));
-}
-
 function requireAdmin(req, res, next) {
   if (req.headers['x-admin-password'] !== ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'Unauthorized' });
