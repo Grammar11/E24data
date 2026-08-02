@@ -14,7 +14,7 @@ const PDFDocument = require('pdfkit');
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 const PORT = process.env.PORT || 3000;
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '@Nura2652';
@@ -264,65 +264,73 @@ app.post('/api/ussd', async (req, res) => {
      return res.send('END Sorry, something went wrong. Please try again later.');
   }
 });
-app.post('/api/cards/pdf', requireAdmin, (req, res) => {
+app.post('/api/cards/pdf', (req, res) => {
  try {
-  const { cards } = req.body;
+  if (req.body.adminPassword !== ADMIN_PASSWORD) {
+    return res.status(401).send('Unauthorized');
+  }
+  let cards;
+  try {
+    cards = JSON.parse(req.body.cards);
+  } catch (e) {
+    return res.status(400).send('Invalid cards data');
+  }
   if (!Array.isArray(cards) || cards.length === 0) {
-    return res.status(400).json({ error: 'No cards provided' });
+    return res.status(400).send('No cards provided');
   }
   console.log(`📄 PDF request: ${cards.length} cards`);
 
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename="e24data-cards.pdf"');
+
   const doc = new PDFDocument({ size: 'A4', margin: 20 });
+  doc.pipe(res);
+
   const gap = 6;
-    const cols = 5;
-    const rows = 10;
-    const perPage = cols * rows;
-    const margin = 20;
-    const cardW = (doc.page.width - margin * 2 - gap * (cols - 1)) / cols;
-    const cardH = (doc.page.height - margin * 2 - gap * (rows - 1)) / rows;
+  const cols = 5;
+  const rows = 10;
+  const perPage = cols * rows;
+  const margin = 20;
+  const cardW = (doc.page.width - margin * 2 - gap * (cols - 1)) / cols;
+  const cardH = (doc.page.height - margin * 2 - gap * (rows - 1)) / rows;
 
-    cards.forEach((card, i) => {
-      const posInPage = i % perPage;
-      if (i > 0 && posInPage === 0) doc.addPage();
+  cards.forEach((card, i) => {
+    const posInPage = i % perPage;
+    if (i > 0 && posInPage === 0) doc.addPage();
 
-      const col = posInPage % cols;
-      const row = Math.floor(posInPage / cols);
-      const x = margin + col * (cardW + gap);
-      const y = margin + row * (cardH + gap);
+    const col = posInPage % cols;
+    const row = Math.floor(posInPage / cols);
+    const x = margin + col * (cardW + gap);
+    const y = margin + row * (cardH + gap);
 
-      doc.rect(x, y, cardW, cardH).stroke();
+    doc.rect(x, y, cardW, cardH).stroke();
 
-      // Layi 1: Logo + E24MARKET (hagu) da Network+Size (dama)
-      doc.rect(x + 5, y + 5, 7, 7).fill('black');
-      doc.fillColor('black');
-      doc.fontSize(7).font('Helvetica-Bold')
-        .text('E24MARKET', x + 15, y + 5, { width: cardW / 2, align: 'left' });
-      doc.fontSize(7).font('Helvetica-Bold')
+    doc.rect(x + 5, y + 5, 7, 7).fill('black');
+    doc.fillColor('black');
+    doc.fontSize(7).font('Helvetica-Bold')
+      .text('E24MARKET', x + 15, y + 5, { width: cardW / 2, align: 'left' });
+    doc.fontSize(7).font('Helvetica-Bold')
       .text(`${card.network} ${card.size}`, x, y + 5, { width: cardW - 5, align: 'right' });
-        // Layi 2: Serial Number - karami sosai
-      doc.fontSize(5).font('Helvetica')
-        .text(`S/N: ${String(i + 1).padStart(5, '0')}`, x, y + 18, { width: cardW, align: 'center' });
 
-      // Layi 3: PIN: [pin] - babba, bold, monospace
-      doc.fontSize(13).font('Courier-Bold')
-        .text(`PIN: ${card.pin}`, x, y + cardH / 2 - 7, { width: cardW, align: 'center' });
+    doc.fontSize(5).font('Helvetica')
+      .text(`S/N: ${String(i + 1).padStart(5, '0')}`, x, y + 18, { width: cardW, align: 'center' });
 
-      // Layi 4: Dial to redeem - karami, ba bold ba
-      doc.fontSize(6).font('Helvetica')
-        .text('Dial *XXXX# to redeem', x, y + cardH - 22, { width: cardW, align: 'center' });
+    doc.fontSize(13).font('Courier-Bold')
+      .text(`PIN: ${card.pin}`, x, y + cardH / 2 - 7, { width: cardW, align: 'center' });
 
-      // Layi 5: Customer Care - karami sosai
-      doc.fontSize(5).font('Helvetica')
-        .text('Customer Care: 08147972378', x, y + cardH - 12, { width: cardW, align: 'center' });
-    
+    doc.fontSize(6).font('Helvetica')
+      .text('Dial *XXXX# to redeem', x, y + cardH - 22, { width: cardW, align: 'center' });
+
+    doc.fontSize(5).font('Helvetica')
+      .text('Customer Care: 08147972378', x, y + cardH - 12, { width: cardW, align: 'center' });
   });
 
-    doc.end();
-    console.log('✅ PDF generation complete');
+  doc.end();
+  console.log('✅ PDF generation complete');
  } catch (err) {
-    console.error('❌ PDF generation error:', err.message);
-    console.error(err.stack);
-    if (!res.headersSent) res.status(500).json({ error: 'PDF generation failed: ' + err.message });
+  console.error('❌ PDF generation error:', err.message);
+  console.error(err.stack);
+  if (!res.headersSent) res.status(500).send('PDF generation failed: ' + err.message);
  }
 });
 connectDB()
