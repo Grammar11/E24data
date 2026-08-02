@@ -67,8 +67,8 @@ async function saveDB(db) {
 }
 
 function genPin() {
-  const seg = () => String(Math.floor(1000 + Math.random() * 9000));
-  return `${seg()}-${seg()}-${seg()}`;
+    return String(Math.floor(10000000 + Math.random() * 90000000));
+}
 }
 
 function requireAdmin(req, res, next) {
