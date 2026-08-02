@@ -333,8 +333,7 @@ app.post('/api/cards/pdf', (req, res) => {
       .text(`${card.network} ${card.size}`, x, y + 5, { width: cardW - 5, align: 'right' });
 
     doc.fontSize(5).font('Helvetica')
-      .text(`S/N: ${String(i + 1).padStart(5, '0')}`, x, y + 18, { width: cardW, align: 'center' });
-
+      .text(`S/N: ${card.serial || String(i + 1).padStart(8, '0')}`, x, y + 18, { width: cardW, align: 'center' });
     doc.fontSize(13).font('Courier-Bold')
       .text(`PIN: ${card.pin}`, x, y + cardH / 2 - 7, { width: cardW, align: 'center' });
 
