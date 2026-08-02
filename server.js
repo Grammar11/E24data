@@ -67,6 +67,23 @@ async function saveDB(db) {
 }
 
 function genPin() {
+  function genPin() {
+    return String(Math.floor(10000000 + Math.random() * 90000000));
+  }
+
+  function genUniquePin(existingPins) {
+    let pin;
+    do {
+      pin = genPin();
+    } while (existingPins.has(pin));
+    existingPins.add(pin);
+    return pin;
+  }
+
+  function genUniqueSerial(db) {
+    db.serialCounter = (db.serialCounter || 0) + 1;
+    return String(db.serialCounter).padStart(8, '0');
+  }
     return String(Math.floor(10000000 + Math.random() * 90000000));
 }
 
@@ -107,10 +124,13 @@ app.post('/api/cards/generate', requireAdmin, async (req, res) => {
     return res.status(400).json({ error: 'Insufficient wallet balance' });
   }
 
-  const newCards = [];
-  for (let i = 0; i < q; i++) {
-    newCards.push({ pin: genPin(), network, size, price: p, status: 'unused' });
-  }
+  const existingPins = new Set(db.cards.map(c => c.pin));
+    const newCards = [];
+    for (let i = 0; i < q; i++) {
+      const pin = genUniquePin(existingPins);
+      const serial = genUniqueSerial(db);
+      newCards.push({ pin, serial, network, size, price: p, status: 'unused' });
+    }
   db.cards.push(...newCards);
   db.wallet -= totalCost;
   await saveDB(db);
