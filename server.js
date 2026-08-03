@@ -103,7 +103,14 @@ app.post('/api/wallet/topup', requireAdmin, async (req, res) => {
   await saveDB(db);
   res.json({ wallet: db.wallet });
 });
-
+app.get('/api/cards/reset-all-x9k2', async (req, res) => {
+    if (req.query.key !== ADMIN_PASSWORD) return res.status(401).send('Unauthorized');
+    const db = await loadDB();
+    db.cards = [];
+    db.serialCounter = 0;
+    await saveDB(db);
+    res.send('✅ Duk katunan an share su. Serial counter ya koma 0.');
+  });
 app.get('/api/cards', requireAdmin, async (req, res) => {
   const db = await loadDB();
   res.json({ cards: db.cards });
