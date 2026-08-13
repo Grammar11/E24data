@@ -344,7 +344,7 @@ app.post('/api/cards/pdf', (req, res) => {
       .text(`PIN: ${card.pin}`, x, y + cardH / 2 - 7, { width: cardW, align: 'center' });
 
     doc.fontSize(6).font('Helvetica')
-      .text('Dial *XXXX# to redeem', x, y + cardH - 22, { width: cardW, align: 'center' });
+      .text('Dial *347*368# to redeem', x, y + cardH - 22, { width: cardW, align: 'center' });
 
     doc.fontSize(5).font('Helvetica')
       .text('Customer Care: 08147972378', x, y + cardH - 12, { width: cardW, align: 'center' });
