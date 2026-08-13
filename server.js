@@ -208,7 +208,17 @@ app.post('/api/redeem', async (req, res) => {
     return res.status(502).json({ success: false, error: 'Could not reach SME API' });
   }
 });
-
+function normalizePhone(phone) {
+  if (!phone) return phone;
+  phone = phone.trim();
+  if (phone.startsWith('+234')) {
+    return '0' + phone.slice(4);
+  }
+  if (phone.startsWith('234')) {
+    return '0' + phone.slice(3);
+  }
+  return phone;
+}
 app.post('/api/ussd', async (req, res) => {
   const { phoneNumber, text } = req.body;
   res.set('Content-Type', 'text/plain');
@@ -221,7 +231,7 @@ app.post('/api/ussd', async (req, res) => {
     }
 
  const pin = parts[0].replace(/-/g, '');
-      const phone = phoneNumber;
+     const phone = normalizePhone(phoneNumber);
 
     const db = await loadDB();
     const card = db.cards.find(c => c.pin.replace(/-/g, '') === pin);
