@@ -189,7 +189,7 @@ app.post('/api/redeem', async (req, res) => {
       card.orderRef = ref;
       await saveDB(db);
      return res.send(`END Congratulations\nYou have received ${card.size} ${card.network} data from E24 Market, thank you for using E24 Market`);
-
+    }
     console.log('SME API rejected order. Raw response:', JSON.stringify(result));
     return res.status(502).json({
       success: false,
