@@ -277,7 +277,7 @@ app.post('/api/ussd', async (req, res) => {
       card.redeemedAt = new Date().toISOString();
       card.orderRef = ref;
       await saveDB(db);
-      return res.send(`END Success! ${card.size} has been sent to ${phone}`);
+      return res.send(`END Congratulations\nYou have received ${card.size} ${card.network} data from E24 Market, thank you for using E24 Market`);
     }
 
     return res.send('END Sorry, the network could not complete this order. Please try again later.');
