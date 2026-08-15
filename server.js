@@ -338,15 +338,16 @@ app.post('/api/cards/pdf', (req, res) => {
       .text(`${card.network} ${card.size}`, x, y + 5, { width: cardW - 5, align: 'right' });
 
   doc.fontSize(5).font('Helvetica')
-      .text(`S/N: ${card.serial || String(i + 1).padStart(8, '0')}`, x, y + cardH / 2 - 28, { width: cardW - 10, align: 'center' });
+      .text(`S/N: ${card.serial || String(i + 1).padStart(8, '0')}`, x, y + cardH / 2 - 20, { width: cardW - 10, align: 'center' });
 
     doc.fontSize(5).font('Helvetica')
-      .text('Dial', x, y + cardH / 2 - 20, { width: cardW - 10, align: 'center' });
+      .text('Dial', x, y + cardH / 2 - 12, { width: cardW - 10, align: 'center' });
 
     doc.fontSize(8).font('Courier-Bold')
-      .text(`*347*368*${card.pin}#`, x, y + cardH / 2 - 12, { width: cardW - 4, align: 'center', lineBreak: false });
+      .text(`*347*368*${card.pin}#`, x, y + cardH / 2 - 4, { width: cardW - 4, align: 'center', lineBreak: false });
+
     doc.fontSize(5).font('Helvetica')
-      .text('Customer Care: 08147972378', x, y + cardH - 12, { width: cardW, align: 'center' });
+      .text('Customer Care: 08147972378', x, y + cardH - 6, { width: cardW - 10, align: 'center' });
   });
 
   doc.end();
