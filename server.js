@@ -358,6 +358,26 @@ app.post('/api/cards/pdf', (req, res) => {
   if (!res.headersSent) res.status(500).send('PDF generation failed: ' + err.message);
  }
 });
+app.post('/api/cards/delete-by-serial', async (req, res) => {
+  try {
+    if (req.body.adminPassword !== ADMIN_PASSWORD) {
+      return res.status(401).send('Unauthorized');
+    }
+    const { serials } = req.body;
+    if (!serials || !Array.isArray(serials) || serials.length === 0) {
+      return res.status(400).json({ error: 'Provide an array of serial numbers' });
+    }
+    const db = await loadDB();
+    const before = db.cards.length;
+    db.cards = db.cards.filter(c => !serials.includes(c.serial));
+    const after = db.cards.length;
+    await saveDB(db);
+    res.json({ success: true, removed: before - after, remaining: after });
+  } catch (err) {
+    console.error('Delete by serial error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 connectDB()
   .then(() => {
     app.listen(PORT, () => {
