@@ -337,13 +337,14 @@ app.post('/api/cards/pdf', (req, res) => {
     doc.fontSize(7).font('Helvetica-Bold')
       .text(`${card.network} ${card.size}`, x, y + 5, { width: cardW - 5, align: 'right' });
 
-    doc.fontSize(5).font('Helvetica')
-      .text(`S/N: ${card.serial || String(i + 1).padStart(8, '0')}`, x, y + 18, { width: cardW, align: 'center' });
-    doc.fontSize(13).font('Courier-Bold')
-      .text(`PIN: ${card.pin}`, x, y + cardH / 2 - 7, { width: cardW, align: 'center' });
+  doc.fontSize(5).font('Helvetica')
+        .text(`S/N: ${card.serial || String(i + 1).padStart(8, '0')}`, x, y + cardH / 2 - 20, { width: cardW - 10, align: 'center' });
 
-    doc.fontSize(6).font('Helvetica')
-      .text('Dial *347*368# to redeem', x, y + cardH - 22, { width: cardW, align: 'center' });
+      doc.fontSize(5).font('Helvetica')
+        .text('Dial', x, y + cardH / 2 - 12, { width: cardW - 10, align: 'center' });
+
+      doc.fontSize(9).font('Courier-Bold')
+        .text(`*347*368*${card.pin}#`, x, y + cardH / 2 - 4, { width: cardW - 10, align: 'center' });
 
     doc.fontSize(5).font('Helvetica')
       .text('Customer Care: 08147972378', x, y + cardH - 12, { width: cardW, align: 'center' });
