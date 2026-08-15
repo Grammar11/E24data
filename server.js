@@ -358,11 +358,9 @@ app.post('/api/cards/pdf', (req, res) => {
   if (!res.headersSent) res.status(500).send('PDF generation failed: ' + err.message);
  }
 });
-app.post('/api/cards/delete-by-serial', async (req, res) => {
+app.post('/api/cards/delete-by-serial', requireAdmin, async (req, res) => {
   try {
-    if (req.body.adminPassword !== ADMIN_PASSWORD) {
-      return res.status(401).send('Unauthorized');
-    }
+ 
     const { serials } = req.body;
     if (!serials || !Array.isArray(serials) || serials.length === 0) {
       return res.status(400).json({ error: 'Provide an array of serial numbers' });
