@@ -376,6 +376,28 @@ app.post('/api/cards/delete-by-serial', requireAdmin, async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+app.post('/api/cards/search', requireAdmin, async (req, res) => {
+  try {
+    const { serial, from, to } = req.body;
+    const db = await loadDB();
+    let matched;
+
+    if (serial) {
+      matched = db.cards.filter(c => c.serial === serial.trim());
+    } else if (from && to) {
+      matched = db.cards.filter(c => c.serial >= from.trim() && c.serial <= to.trim());
+    } else {
+      return res.status(400).json({ error: 'Provide a serial, or both from and to' });
+    }
+
+    const used = matched.filter(c => c.status === 'used').length;
+    const unused = matched.filter(c => c.status === 'unused').length;
+    res.json({ success: true, total: matched.length, used, unused, cards: matched });
+  } catch (err) {
+    console.error('Search error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 connectDB()
   .then(() => {
     app.listen(PORT, () => {
