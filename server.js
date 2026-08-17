@@ -361,13 +361,16 @@ app.post('/api/cards/pdf', (req, res) => {
 app.post('/api/cards/delete-by-serial', requireAdmin, async (req, res) => {
   try {
  
-    const { serials } = req.body;
-    if (!serials || !Array.isArray(serials) || serials.length === 0) {
-      return res.status(400).json({ error: 'Provide an array of serial numbers' });
-    }
+    const { serials, from, to } = req.body;
     const db = await loadDB();
     const before = db.cards.length;
-    db.cards = db.cards.filter(c => !serials.includes(c.serial));
+ if (serials && Array.isArray(serials) && serials.length) {
+  db.cards = db.cards.filter(c => !serials.includes(c.serial));
+} else if (from && to) {
+  db.cards = db.cards.filter(c => !(c.serial >= from && c.serial <= to));
+} else {
+  return res.status(400).json({ error: 'Provide serials, or both from and to' });
+ }
     const after = db.cards.length;
     await saveDB(db);
     res.json({ success: true, removed: before - after, remaining: after });
