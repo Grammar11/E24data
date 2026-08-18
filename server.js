@@ -233,7 +233,7 @@ app.post('/api/ussd', async (req, res) => {
      const phone = normalizePhone(phoneNumber);
 
     const db = await loadDB();
-    const card = db.cards.find(c => c.pin.replace(/-/g, '') === pin);
+ const card = db.cards.find(c => c.pin.replace(/-/g, '') === pin);
 
     if (!card) {
       return res.send('END PIN not found. Please check and try again.');
@@ -248,7 +248,13 @@ app.post('/api/ussd', async (req, res) => {
     if (!networkId || !planId) {
       return res.send('END This network/data size is not available yet.');
     }
-
+  const claim = await stateCollection.findOneAndUpdate(
+  { _id: 'main', 'cards.pin': card.pin, 'cards.status': 'unused' },
+  { $set: { 'cards.$.status': 'used', 'cards.$.redeemedTo': phone, 'cards.$.redeemedAt': new Date().toISOString() } }
+);
+if (!claim.value) {
+  return res.send('END This PIN has already been used.');
+} 
     const ref = `E24-${Date.now()}`;
 
     const response = await axios.post(
