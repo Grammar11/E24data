@@ -277,18 +277,24 @@ if (!claim.value) {
 
     const result = response.data;
 
-    if (result && result.status === 'success') {
-      card.status = 'used';
-      card.redeemedTo = phone;
-      card.redeemedAt = new Date().toISOString();
-      card.orderRef = ref;
-      await saveDB(db);
-      return res.send(`END Congratulations\nYou have received ${card.size} ${card.network} data from E24 Market, thank you for using E24 Market`);
-    }
+ if (result && result.status === 'success') {
+  await stateCollection.updateOne(
+    { _id: 'main', 'cards.pin': card.pin },
+    { $set: { 'cards.$.orderRef': ref } }
+  );
+  return res.send(`END Congratulations\nYou have received ${card.size}...`);
+}
 
-    return res.send('END Sorry, the network could not complete this order. Please try again later.');
-
+await stateCollection.updateOne(
+  { _id: 'main', 'cards.pin': card.pin },
+  { $set: { 'cards.$.status': 'unused' }, $unset: { 'cards.$.redeemedTo': '', 'cards.$.redeemedAt': '' } }
+);
+return res.send('END Sorry, the network could not complete this order...');
   } catch (err) {
+    await stateCollection.updateOne(
+      { _id: 'main', 'cards.pin': card.pin },
+      { $set: { 'cards.$.status': 'unused' }, $unset: { 'cards.$.redeemedTo': '', 'cards.$.redeemedAt': '' } }
+    );
      console.error('USSD redeem error - Status:', err.response?.status);
      console.error('USSD redeem error - Body:', JSON.stringify(err.response?.data));
      console.error('USSD redeem error - Message:', err.message);
