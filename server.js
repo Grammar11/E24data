@@ -226,35 +226,42 @@ app.post('/api/ussd', async (req, res) => {
 
   try {
     if (parts.length === 0) {
-      return res.send('CON Welcome to E24Data\nEnter your PIN to redeem data:');
+      return res.send(
+        'CON Welcome to E24Data\nEnter your PIN to redeem data:'
+      );
     }
 
- const pin = parts[0].replace(/-/g, '');
-     const phone = normalizePhone(phoneNumber);
+    const pin = parts[0].replace(/-/g, '');
+    const phone = normalizePhone(phoneNumber);
 
     const db = await loadDB();
- const card = db.cards.find(c => c.pin.replace(/-/g, '') === pin);
+
+    const card = db.cards.find(
+      c => c.pin.replace(/-/g, '') === pin
+    );
 
     if (!card) {
-      return res.send('END PIN not found. Please check and try again.');
+      return res.send(
+        'END PIN not found. Please check and try again.'
+      );
     }
+
     if (card.status === 'used') {
-      return res.send('END This PIN has already been used.');
+      return res.send(
+        'END This PIN has already been used.'
+      );
     }
 
     const networkId = NETWORK_IDS[card.network];
-    const planId = SMEAPI_PLAN_IDS[`${card.network}_${card.size}`];
+    const planId =
+      SMEAPI_PLAN_IDS[`${card.network}_${card.size}`];
 
     if (!networkId || !planId) {
-      return res.send('END This network/data size is not available yet.');
+      return res.send(
+        'END This network/data size is not available yet.'
+      );
     }
-  const claim = await stateCollection.findOneAndUpdate(
-  { _id: 'main', 'cards.pin': card.pin, 'cards.status': 'unused' },
-  { $set: { 'cards.$.status': 'used', 'cards.$.redeemedTo': phone, 'cards.$.redeemedAt': new Date().toISOString() } }
-);
-if (!claim.value) {
-  return res.send('END This PIN has already been used.');
-} 
+
     const ref = `E24-${Date.now()}`;
 
     const response = await axios.post(
@@ -277,28 +284,50 @@ if (!claim.value) {
 
     const result = response.data;
 
- if (result && result.status === 'success') {
-  await stateCollection.updateOne(
-    { _id: 'main', 'cards.pin': card.pin },
-    { $set: { 'cards.$.orderRef': ref } }
-  );
-  return res.send(`END Congratulations\nYou have received ${card.size}...`);
-}
+    if (result && result.status === 'success') {
 
-await stateCollection.updateOne(
-  { _id: 'main', 'cards.pin': card.pin },
-  { $set: { 'cards.$.status': 'unused' }, $unset: { 'cards.$.redeemedTo': '', 'cards.$.redeemedAt': '' } }
-);
-return res.send('END Sorry, the network could not complete this order...');
-  } catch (err) {
-    await stateCollection.updateOne(
-      { _id: 'main', 'cards.pin': card.pin },
-      { $set: { 'cards.$.status': 'unused' }, $unset: { 'cards.$.redeemedTo': '', 'cards.$.redeemedAt': '' } }
+      // Mark the card as USED only after SME API succeeds
+      card.status = 'used';
+      card.redeemedTo = phone;
+      card.redeemedAt = new Date().toISOString();
+      card.orderRef = ref;
+
+      await saveDB(db);
+
+      return res.send(
+        `END Congratulations\nYou have received ${card.size} data.`
+      );
+    }
+
+    console.log(
+      'USSD SME API rejected order:',
+      JSON.stringify(result)
     );
-     console.error('USSD redeem error - Status:', err.response?.status);
-     console.error('USSD redeem error - Body:', JSON.stringify(err.response?.data));
-     console.error('USSD redeem error - Message:', err.message);
-     return res.send('END Sorry, something went wrong. Please try again later.');
+
+    return res.send(
+      'END Sorry, the network could not complete this order. Please try again.'
+    );
+
+  } catch (err) {
+
+    console.error(
+      'USSD redeem error - Status:',
+      err.response?.status
+    );
+
+    console.error(
+      'USSD redeem error - Body:',
+      JSON.stringify(err.response?.data)
+    );
+
+    console.error(
+      'USSD redeem error - Message:',
+      err.message
+    );
+
+    return res.send(
+      'END Sorry, something went wrong. Please try again later.'
+    );
   }
 });
 app.post('/api/cards/pdf', (req, res) => {
