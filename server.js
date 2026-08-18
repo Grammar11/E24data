@@ -295,8 +295,8 @@ app.post('/api/ussd', async (req, res) => {
       await saveDB(db);
 
       return res.send(
-        `END Congratulations\nYou have received ${card.size} data.`
-      );
+  `END Congratulations\nYou have received ${card.size} from E24Market.\nThank you for using E24MARKET`
+     );
     }
 
     console.log(
