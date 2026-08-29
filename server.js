@@ -45,6 +45,15 @@ const SMEAPI_PLAN_IDS = {
 };
 
 const client = new MongoClient(MONGODB_URI);
+
+// Queue don gujewa race condition a redeem
+let redeemQueue = Promise.resolve();
+function enqueueRedeem(task) {
+  const result = redeemQueue.then(() => task());
+  redeemQueue = result.catch(() => {}); // kar mu bari error ya toshe layin gaba
+  return result;
+}
+
 let stateCollection;
 
 async function connectDB() {
