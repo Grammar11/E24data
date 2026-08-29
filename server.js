@@ -338,8 +338,10 @@ app.post('/api/ussd', async (req, res) => {
     return res.send(
       'END Sorry, something went wrong. Please try again later.'
     );
-  }
-});
+ }
+    });
+  });
+
 app.post('/api/cards/pdf', (req, res) => {
  try {
   if (req.body.adminPassword !== ADMIN_PASSWORD) {
