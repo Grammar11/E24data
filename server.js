@@ -257,8 +257,13 @@ app.post('/api/ussd', async (req, res) => {
     }
 
     if (card.status === 'used') {
+      if (card.redeemedTo === phone) {
+        return res.send(
+          'END This PIN has already been used by you.'
+        );
+      }
       return res.send(
-        'END This PIN has already been used.'
+        'END This PIN has already been used by another customer.'
       );
     }
 
