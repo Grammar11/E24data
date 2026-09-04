@@ -228,7 +228,10 @@ function normalizePhone(phone) {
   return phone;
 }
 app.post('/api/ussd', async (req, res) => {
+  const t0 = Date.now();
   await enqueueRedeem(async () => {
+    const t1 = Date.now();
+    console.log(`⏱️ Queue wait: ${t1 - t0}ms`);
   const { phoneNumber, text } = req.body;
   res.set('Content-Type', 'text/plain');
 
@@ -278,7 +281,7 @@ app.post('/api/ussd', async (req, res) => {
     }
 
     const ref = `E24-${Date.now()}`;
-
+    const tBeforeApi = Date.now();
     const response = await axios.post(
       'https://smeapi.com.ng/api/data/',
       {
@@ -296,7 +299,9 @@ app.post('/api/ussd', async (req, res) => {
         }
       }
     );
-
+const tAfterApi = Date.now();
+console.log(`⏱️ SME API call took: ${tAfterApi - tBeforeApi}ms`);
+console.log(`⏱️ Total time from request start: ${tAfterApi - t0}ms`);
     const result = response.data;
 
     if (result && result.status === 'success') {
