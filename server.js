@@ -229,68 +229,90 @@ function normalizePhone(phone) {
 }
 app.post('/api/ussd', async (req, res) => {
   const t0 = Date.now();
+  let responded = false;
+
+  const fallbackTimer = setTimeout(() => {
+    if (!responded) {
+      responded = true;
+      console.log('⏱️ Fallback triggered (> 9.5s from request start)');
+      res.send('END Thank you. Your request is being processed, you will receive a confirmation shortly.');
+    }
+  }, 9500);
+
   await enqueueRedeem(async () => {
     const t1 = Date.now();
     console.log(`⏱️ Queue wait: ${t1 - t0}ms`);
-  const { phoneNumber, text } = req.body;
-  res.set('Content-Type', 'text/plain');
 
-  const parts = (text || '').split('*').filter(Boolean);
+    const { phoneNumber, text } = req.body;
+    res.set('Content-Type', 'text/plain');
 
-  try {
-    if (parts.length === 0) {
-      return res.send(
-        'CON Welcome to E24Data\nEnter your PIN to redeem data:'
-      );
-    }
+    const parts = (text || '').split('*').filter(Boolean);
 
-    const pin = parts[0].replace(/-/g, '');
-    const phone = normalizePhone(phoneNumber);
-
-    const db = await loadDB();
-
-    const card = db.cards.find(
-      c => c.pin.replace(/-/g, '') === pin
-    );
-
-    if (!card) {
-      return res.send(
-        'END PIN not found. Please check and try again.'
-      );
-    }
-
-    if (card.status === 'used') {
-      if (card.redeemedTo === phone) {
-        return res.send(
-          'END This PIN has already been used by you.'
-        );
-      }
-      return res.send(
-        'END This PIN has already been used by another customer.'
-      );
-    }
-
-    const networkId = NETWORK_IDS[card.network];
-    const planId =
-      SMEAPI_PLAN_IDS[`${card.network}_${card.size}`];
-
-    if (!networkId || !planId) {
-      return res.send(
-        'END This network/data size is not available yet.'
-      );
-    }
-
-    const ref = `E24-${Date.now()}`;
-      const tBeforeApi = Date.now();
-      let responded = false;
-
-      const fallbackTimer = setTimeout(() => {
+    try {
+      if (parts.length === 0) {
         if (!responded) {
           responded = true;
-          console.log('⏱️ Fallback triggered (SME API > 9.5s)');
-          res.send('END Thank you. Your request is being processed, you will receive a confirmation shortly.');
+          clearTimeout(fallbackTimer);
+          return res.send(
+            'CON Welcome to E24Data\nEnter your PIN to redeem data:'
+          );
         }
-      }, 9500);
+        return;
+      }
+
+      const pin = parts[0].replace(/-/g, '');
+      const phone = normalizePhone(phoneNumber);
+
+      const db = await loadDB();
+
+      const card = db.cards.find(
+        c => c.pin.replace(/-/g, '') === pin
+      );
+
+      if (!card) {
+        if (!responded) {
+          responded = true;
+          clearTimeout(fallbackTimer);
+          return res.send(
+            'END PIN not found. Please check and try again.'
+          );
+        }
+        return;
+      }
+
+      if (card.status === 'used') {
+        if (!responded) {
+          responded = true;
+          clearTimeout(fallbackTimer);
+          if (card.redeemedTo === phone) {
+            return res.send(
+              'END This PIN has already been used by you.'
+            );
+          }
+          return res.send(
+            'END This PIN has already been used by another customer.'
+          );
+        }
+        return;
+      }
+
+      const networkId = NETWORK_IDS[card.network];
+      const planId =
+        SMEAPI_PLAN_IDS[`${card.network}_${card.size}`];
+
+      if (!networkId || !planId) {
+        if (!responded) {
+          responded = true;
+          clearTimeout(fallbackTimer);
+          return res.send(
+            'END This network/data size is not available yet.'
+          );
+        }
+        return;
+      }
+
+      const ref = `E24-${Date.now()}`;
+      const tBeforeApi = Date.now();
 
       const response = await axios.post(
         'https://smeapi.com.ng/api/data/',
@@ -348,29 +370,35 @@ app.post('/api/ussd', async (req, res) => {
       }
       return;
 
-  } catch (err) {
+    } catch (err) {
 
-    console.error(
-      'USSD redeem error - Status:',
-      err.response?.status
-    );
+      clearTimeout(fallbackTimer);
 
-    console.error(
-      'USSD redeem error - Body:',
-      JSON.stringify(err.response?.data)
-    );
+      console.error(
+        'USSD redeem error - Status:',
+        err.response?.status
+      );
 
-    console.error(
-      'USSD redeem error - Message:',
-      err.message
-    );
+      console.error(
+        'USSD redeem error - Body:',
+        JSON.stringify(err.response?.data)
+      );
 
-    return res.send(
-      'END Sorry, something went wrong. Please try again later.'
-    );
-   }
-    });
+      console.error(
+        'USSD redeem error - Message:',
+        err.message
+      );
+
+      if (!responded) {
+        responded = true;
+        return res.send(
+          'END Sorry, something went wrong. Please try again later.'
+        );
+      }
+      return;
+    }
   });
+});
 
 app.post('/api/cards/pdf', (req, res) => {
  try {
