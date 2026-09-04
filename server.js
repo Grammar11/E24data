@@ -228,7 +228,7 @@ function normalizePhone(phone) {
   return phone;
 }
 app.post('/api/ussd', async (req, res) => {
-  
+  await enqueueRedeem(async () => {
   const { phoneNumber, text } = req.body;
   res.set('Content-Type', 'text/plain');
 
@@ -343,8 +343,8 @@ app.post('/api/ussd', async (req, res) => {
     return res.send(
       'END Sorry, something went wrong. Please try again later.'
     );
- }
-    
+   }
+    });
   });
 
 app.post('/api/cards/pdf', (req, res) => {
