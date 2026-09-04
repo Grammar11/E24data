@@ -281,52 +281,72 @@ app.post('/api/ussd', async (req, res) => {
     }
 
     const ref = `E24-${Date.now()}`;
-    const tBeforeApi = Date.now();
-    const response = await axios.post(
-      'https://smeapi.com.ng/api/data/',
-      {
-        network: networkId,
-        data_plan: planId,
-        phone: phone,
-        ported_number: false,
-        ref: ref
-      },
-      {
-        headers: {
-          'Authorization': `Token ${process.env.SMEAPI_KEY?.trim()}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+      const tBeforeApi = Date.now();
+      let responded = false;
+
+      const fallbackTimer = setTimeout(() => {
+        if (!responded) {
+          responded = true;
+          console.log('⏱️ Fallback triggered (SME API > 9.5s)');
+          res.send('END Thank you. Your request is being processed, you will receive a confirmation shortly.');
         }
+      }, 9500);
+
+      const response = await axios.post(
+        'https://smeapi.com.ng/api/data/',
+        {
+          network: networkId,
+          data_plan: planId,
+          phone: phone,
+          ported_number: false,
+          ref: ref
+        },
+        {
+          headers: {
+            'Authorization': `Token ${process.env.SMEAPI_KEY?.trim()}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        }
+      );
+
+      clearTimeout(fallbackTimer);
+      const tAfterApi = Date.now();
+      console.log(`⏱️ SME API call took: ${tAfterApi - tBeforeApi}ms`);
+      console.log(`⏱️ Total time from request start: ${tAfterApi - t0}ms`);
+      const result = response.data;
+
+      if (result && result.status === 'success') {
+
+        // Mark the card as USED only after SME API succeeds
+        card.status = 'used';
+        card.redeemedTo = phone;
+        card.redeemedAt = new Date().toISOString();
+        card.orderRef = ref;
+
+        await saveDB(db);
+
+        if (!responded) {
+          responded = true;
+          return res.send(
+            `END Congratulations\nYou have received ${card.size} from E24Market.\nThank you for using E24 MARKET`
+          );
+        }
+        return;
       }
-    );
-const tAfterApi = Date.now();
-console.log(`⏱️ SME API call took: ${tAfterApi - tBeforeApi}ms`);
-console.log(`⏱️ Total time from request start: ${tAfterApi - t0}ms`);
-    const result = response.data;
 
-    if (result && result.status === 'success') {
+      console.log(
+        'USSD SME API rejected order:',
+        JSON.stringify(result)
+      );
 
-      // Mark the card as USED only after SME API succeeds
-      card.status = 'used';
-      card.redeemedTo = phone;
-      card.redeemedAt = new Date().toISOString();
-      card.orderRef = ref;
-
-      await saveDB(db);
-
-      return res.send(
-  `END Congratulations\nYou have received ${card.size} from E24Market.\nThank you for using E24MARKET`
-     );
-    }
-
-    console.log(
-      'USSD SME API rejected order:',
-      JSON.stringify(result)
-    );
-
-    return res.send(
-      'END Sorry, the network could not complete this order. Please try again.'
-    );
+      if (!responded) {
+        responded = true;
+        return res.send(
+          'END Sorry, the network could not complete this order. Please try again later.'
+        );
+      }
+      return;
 
   } catch (err) {
 
