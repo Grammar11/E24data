@@ -237,7 +237,7 @@ app.post('/api/ussd', async (req, res) => {
       console.log('⏱️ Fallback triggered (> 9.5s from request start)');
       res.send('END Thank you. Your request is being processed, you will receive a confirmation shortly.');
     }
-  }, 7500);
+  }, 9500);
 
   await enqueueRedeem(async () => {
     const t1 = Date.now();
