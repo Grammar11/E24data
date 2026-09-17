@@ -245,8 +245,9 @@ app.post('/api/ussd', async (req, res) => {
     console.log(`⏱️ Queue wait: ${t1 - t0}ms`);
 
     const { phoneNumber, text } = req.body;
+    if (!responded) {
     res.set('Content-Type', 'text/plain');
-
+    }
     const parts = (text || '').split('*').filter(Boolean);
 
     try {
