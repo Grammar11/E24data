@@ -32,7 +32,7 @@ const NETWORK_IDS = {
 };
 
 const SMEAPI_PLAN_IDS = {
-  MTN_500MB: 1,
+  MTN_500MB: 152,
   MTN_1GB: 158,
   MTN_2GB: 3,
   MTN_3GB: 4,
