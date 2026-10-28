@@ -492,6 +492,26 @@ app.post('/api/cards/delete-by-serial', requireAdmin, async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+app.post('/api/cards/delete-redeemed', requireAdmin, async (req, res) => {
+  try {
+    const { confirm } = req.body;
+    const db = await loadDB();
+    const usedCount = db.cards.filter(c => c.status === 'used').length;
+
+    if (confirm !== true) {
+      return res.json({ success: true, preview: true, count: usedCount });
+    }
+
+    const before = db.cards.length;
+    db.cards = db.cards.filter(c => c.status !== 'used');
+    const after = db.cards.length;
+    await saveDB(db);
+    res.json({ success: true, removed: before - after, remaining: after });
+  } catch (err) {
+    console.error('Delete redeemed error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 app.post('/api/cards/search', requireAdmin, async (req, res) => {
   try {
     const { serial, from, to } = req.body;
